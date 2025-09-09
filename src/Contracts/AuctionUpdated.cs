@@ -10,4 +10,5 @@ public class AuctionUpdated
     public int Year { get; set; }
     public string Color { get; set; }
     public int Mileage { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

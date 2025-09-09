@@ -95,6 +95,11 @@ public class AuctionsController : ControllerBase
         auction.Item.Mileage = updateAuctionDto.Mileage ?? auction.Item.Mileage;
         auction.Item.Year = updateAuctionDto.Year ?? auction.Item.Year;
 
+    // update timestamp before publishing so consumers receive the latest UpdatedAt
+    auction.UpdatedAt = DateTime.UtcNow;
+
+    await _publishEndpoint.Publish(_mapper.Map<AuctionUpdated>(auction));
+
         var result = await _context.SaveChangesAsync() > 0;
         if (!result)
         {
@@ -113,6 +118,9 @@ public class AuctionsController : ControllerBase
         // TODO: verify that seller is the current user
 
         _context.Auctions.Remove(auction);
+
+        await _publishEndpoint.Publish(new AuctionDeleted { Id = auction.Id.ToString() });
+
         var result = await _context.SaveChangesAsync() > 0;
         if (!result)
         {
