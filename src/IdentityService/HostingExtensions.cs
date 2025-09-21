@@ -71,13 +71,19 @@ internal static class HostingExtensions
                 {
                     options.Diagnostics.ChunkSize = 1024 * 1024 * 10; // 10 MB
                 }
+                
+                if (builder.Environment.IsEnvironment("Docker"))
+                {
+                    options.IssuerUri = "http://localhost:5001";
+                }
             })
             .AddInMemoryIdentityResources(Config.IdentityResources)
             .AddInMemoryApiScopes(Config.ApiScopes)
             .AddInMemoryClients(Config.Clients)
             .AddAspNetIdentity<ApplicationUser>()
             .AddProfileService<CustomProfileService>()
-            .AddLicenseSummary();
+                .AddDeveloperSigningCredential(persistKey: true, filename: "/app/keys/tempkey.jwk")
+                .AddLicenseSummary();
 
         builder.Services.ConfigureApplicationCookie(options =>
         {

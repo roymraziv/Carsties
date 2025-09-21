@@ -7,6 +7,11 @@ services:
       - 5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
   mongodb:
     image: mongo
     environment:
@@ -16,11 +21,22 @@ services:
       - 27017:27017
     volumes:
       - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--username=root", "--password=mongopw", "--authenticationDatabase=admin", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
       - 5672:5672
       - 15672:15672
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 50s
+      retries: 5
   auction-svc:
     image: rmraziv/auction-svc:latest
     build:
@@ -35,8 +51,10 @@ services:
     ports:
       - 7001:80
     depends_on:
-      - postgres
-      - rabbitmq
+        postgres: 
+          condition: service_healthy
+        rabbitmq:
+          condition: service_healthy
   search-svc:
     image: rmraziv/search-svc:latest
     build:
@@ -46,13 +64,43 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - RabbitMq__Host=rabbitmq
-      - ConnectionStrings__MongoDBConnection=mongodb://root:mongopw@mongodb
+      - ConnectionStrings__MongoDBConnection=mongodb://root:mongopw@mongodb/?authSource=admin
       - AuctionServiceUrl=http://auction-svc
     ports:
       - 7002:80
     depends_on:
-      - mongodb
-      - rabbitmq
+      mongodb: 
+        condition: service_healthy
+      rabbitmq:
+          condition: service_healthy
+  identity-svc:
+    image: rmraziv/identity-svc:latest
+    build:
+      context: .
+      dockerfile: ./src/IdentityService/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=postgres:5432;User Id=postgres;Password=postgrespw;Database=identity
+
+    ports:
+      - 5001:80
+    depends_on:
+      - postgres
+  gateway-svc:
+    image: rmraziv/gateway-svc:latest
+    build:
+      context: .
+      dockerfile: ./src/GatewayService/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:80
+      - IdentityServiceUrl=http://identity-svc
+    ports:
+      - 6001:80
+    depends_on:
+        postgres: 
+          condition: service_healthy
 volumes:
   pgdata:
   mongodata:

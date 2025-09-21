@@ -46,6 +46,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.RequireHttpsMetadata = false;
         options.TokenValidationParameters.ValidateAudience = false;
         options.TokenValidationParameters.NameClaimType = "username";
+        options.TokenValidationParameters.ValidIssuers = new[]
+        {
+            builder.Configuration["IdentityServiceUrl"],
+            "http://localhost:5001",
+            "http://identity-svc"
+        };
     });
 
 var app = builder.Build();
